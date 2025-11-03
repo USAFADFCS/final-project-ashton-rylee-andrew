@@ -65,8 +65,8 @@ When you first run the program, the model will download automatically to ~/.cach
 ### Step 2 — Test Model Response
 ```python
 >>> from transformers import AutoModelForCausalLM, AutoTokenizer
->>> tok = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
->>> model = AutoModelForCausalLM.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+>>> tok = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+>>> model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
 >>> print("✅ Model loaded successfully")
 ```
 
