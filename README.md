@@ -152,6 +152,7 @@ All coding, implementation, and testing will be completed by the project team me
 | Name | GitHub Username |
 |------|-----------------|
 | Ashton Blair | @c26ashtonblair |
+| AJ Palmer | @Andrew-Palmer26 |
 | Rylee Au | @rylee808 |
 
 
