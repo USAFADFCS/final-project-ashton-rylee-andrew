@@ -1,165 +1,226 @@
-# 🤝 Consent-First Social Wingman
+# 🤝 Consent-First Social Wingman  
 **CS 471 – FairLLM Final Project**
 
-> *An agentic AI system designed to promote respectful, consent-based social interactions through ethical communication guidance and context-aware event suggestions.*
+> *An agentic AI system for generating respectful, consent-aware messages and suggesting activities using a local RAG-based recommendation system.*
 
 ---
 
 ## 📘 Overview
-The **Consent-First Social Wingman** is an agentic AI assistant built using the **FairLLM framework**.  
-Its mission is to help users navigate social interactions ethically — generating respectful, confident messages while ensuring all communication upholds principles of **mutual consent**, **tone sensitivity**, and **contextual appropriateness**.
+The **Consent-First Social Wingman** is an agentic AI assistant built with the **FairLLM framework** and **OpenAI’s GPT-4.1-mini**.  
 
-Unlike typical “AI dating” or “conversation” tools that prioritize persuasion or humor, this system focuses on **empathy and autonomy**, reinforcing positive social norms while supporting the user’s confidence and self-awareness.
+It helps users communicate confidently and respectfully by:
+
+- Analyzing conversational context  
+- Generating consent-forward message drafts  
+- Ensuring tone is warm, balanced, and non-pressuring  
+- Suggesting activity ideas using a **local RAG index** instead of external APIs  
+- Formatting the final output into a clean, user-friendly message
+
+This system prioritizes **ethics, autonomy, and tone sensitivity**, not persuasion or manipulation.
 
 ---
 
 ## 🎯 Objectives
-- Promote **ethical and transparent AI-assisted communication**.
-- Generate messages that balance friendliness, confidence, and consent.
-- Detect and correct **non-consensual or manipulative phrasing**.
-- Suggest **local events** that align with user interests and availability.
-- Encourage user agency by offering structured, opt-in dialogue options.
-- Demonstrate how multiple small models can work together through **agentic reasoning**.
+- Promote ethical, consent-respecting communication  
+- Support confidence and clarity in social or romantic outreach  
+- Avoid manipulative or coercive phrasing  
+- Suggest low-stress or high-energy activities using semantic search  
+- Demonstrate FairLLM’s ReAct planning and tool execution pipeline  
+- Provide an optional UI for ease of use  
 
 ---
 
 ## 🧩 System Architecture
-The system uses a modular agentic design where each agent or tool performs a specialized ethical or contextual reasoning function.  
-A coordinating agent manages communication between all modules to ensure balanced, responsible behavior.
+The system uses a **single ReAct agent** powered by GPT-4.1-mini, orchestrating several tools.
 
-| Agent / Tool | Role |
-|---------------|------|
-| **MessageGeneratorAgent** | Creates candidate social messages based on user input. |
-| **ConsentCheckTool** | Scans messages for implied pressure or missing consent language. |
-| **ToneAdjusterTool** | Refines text for warmth, confidence, and emotional awareness. |
-| **ContextAnalyzerTool** | Evaluates the relationship stage and environment context (e.g., first meeting vs. established friendship). |
-| **LocalEventMatcherTool** | Retrieves local events that match user interests and schedule. |
-| **CalendarAvailabilityTool** | Checks calendar availability to prevent scheduling conflicts. |
-| **InterestProfilerTool** | Tracks and ranks user interests (e.g., music, art, fitness) to tailor event suggestions. |
-| **ConsentPromptBuilderTool** | Generates opt-in phrasing for invitations (e.g., “if you’d like to join…”). |
-| **StructuredDialogueFormatterTool** | Presents final safe, confidence-balanced conversation options for the user. |
+### Active Tools (Used in This Version)
 
----
+| Tool | Function |
+|------|----------|
+| **ContextAnalyzerTool** | Interprets social context (first meeting, energy level, location). |
+| **MessageGeneratorTool** | Produces raw message drafts. |
+| **ConsentCheckTool** | Ensures messages include opt-in, pressure-free phrasing. |
+| **ToneAdjusterTool** | Adds warmth, friendliness, and confidence. |
+| **LocalEventMatcherTool** *(RAG)* | Suggests activities using a FAISS vector store from `activities_catalog_tagged.md`. |
+| **DialogueFormatterTool** | Builds the final combined message + activity suggestions. |
 
-## 🧠 Model & Data
-- **Foundational Model:** `TinyLlama/TinyLlama-1.1B-Chat-v1.0` (Hugging Face)  
-- **Why This Model:**  
-  - Lightweight and deployable on edge devices.  
-  - Supports conversational reasoning and context adaptation.  
-  - Requires additional agents to handle consent, tone, and personalization — aligning perfectly with FairLLM’s agentic approach.
+### Model
+- **OpenAI GPT-4.1-mini (Responses API)**  
+- Accessed using a custom adapter to integrate with FairLLM
 
-- **Data Inputs:**  
-  - User message requests (free text).  
-  - User interest profiles (JSON file).  
-  - Schedule availability data (simulated calendar).  
-  - Event feeds (from APIs like Eventbrite, Ticketmaster, or a static dataset).
+### RAG Components
+- **DocumentProcessor** for semantic text chunking  
+- **SentenceTransformerEmbedder** (MiniLM-L6-v2)  
+- **FaissVectorStore** for activity embeddings  
+- **SimpleRetriever** for top-k activity recommendations  
 
-- **Outputs:**  
-  - Polished message drafts with transparent consent validation.  
-  - Structured event recommendations that align with interests and schedule.  
-  - Safe, respectful invitation phrasing for each event.
+The activity library lives in:
+```
+activities_catalog_tagged.md
+```
 
 ---
 
-## 🧭 Ethical Design Principles
-The Consent-First Social Wingman strictly follows **FairLLM’s ethical communication standards**, including:
+## 🧠 Model & Data Sources
 
-- **Consent-First:** Always ensures messages contain voluntary, non-pressuring phrasing.  
-- **Transparency:** Clearly communicates reasoning steps and message modifications.  
-- **Fairness:** Avoids gendered stereotypes, manipulative tactics, or overgeneralization.  
-- **Safety:** Rejects prompts that encourage deceit, harassment, or non-consensual behavior.  
-- **Explainability:** Provides reasoning for why certain suggestions or rewrites were made.
+### LLM
+- **Model:** `gpt-4.1-mini`  
+- **Why:**  
+  - Fast  
+  - Low cost  
+  - Strong reasoning for ReAct chains  
+  - Excellent at natural, polite message generation
+
+### Data Inputs
+- User prompt text  
+- Automatically generated social context metadata  
+- Embedded activity chunks from the local catalog
+
+### Outputs
+- One carefully crafted, consent-forward message  
+- 1–3 matched activity suggestions displayed below it  
 
 ---
 
-## ⚙️ FairLLM Integration
-FairLLM enables this system to operate as a **coordinated network of small, transparent agents**, rather than a single monolithic model.  
-This approach enhances interpretability, ensures ethical alignment, and supports deployment on lightweight hardware (such as edge devices or mobile systems).
+## 🧭 Ethical Design Principles  
 
-The Wingman’s architecture demonstrates:
-- **Orchestration:** The ability to chain multiple reasoning steps together.  
-- **Transparency:** Traceable reasoning for each tool’s contribution.  
-- **Adaptability:** Support for replacing or updating individual tools independently.
+The Wingman follows FairLLM’s ethical standards:
+
+- **Consent-first** phrasing (always optional, non-pressuring)  
+- **Safety** — no manipulation, coercion, or sexual content  
+- **Empathy** — warm tone, clear boundaries  
+- **Transparency** — user-visible reasoning steps via ReAct  
+- **Autonomy** — user chooses how to proceed; AI does not decide for them  
 
 ---
 
-## 📍 Workflow Example
+## 📍 Workflow Example  
+
 1. **User Input:**  
-   “Help me start a conversation with someone I met at a coffee shop this weekend.”
+   “I met someone at the gym and I want to ask them to hang out.”
 
-2. **MessageGeneratorAgent:**  
-   Produces 2–3 possible message drafts.
+2. **ContextAnalyzerTool:**  
+   Detects: first meeting, high energy, location = Colorado Springs
 
-3. **ConsentCheckTool:**  
-   Flags overly direct or assumptive lines; keeps only messages with explicit consent cues.
+3. **LocalEventMatcherTool:**  
+   Uses RAG to return activities such such as:  
+   - Bowling  
+   - Picnic  
+   - Walk on a local trail  
 
-4. **ToneAdjusterTool:**  
-   Rewrites text for warmth, confidence, and respect.
+4. **MessageGeneratorTool:**  
+   Drafts an opening line
 
-5. **LocalEventMatcherTool:**  
-   Finds nearby weekend events that match user interests and schedule.
+5. **ConsentCheckTool:**  
+   Ensures phrases include things like:  
+   *“No pressure at all — only if you want to!”*
 
-6. **ConsentPromptBuilderTool:**  
-   Adds opt-in invitation phrasing such as:  
-   *“If you’re free and would like to, maybe we could check out this art fair?”*
+6. **ToneAdjusterTool:**  
+   Adds warmth + friendliness  
 
-7. **StructuredDialogueFormatterTool:**  
-   Presents final safe message options for the user to select or edit.
+7. **DialogueFormatterTool:**  
+   Produces final message + bullet list of suggested activities  
 
 ---
 
-## 🌐 Local Event Matching
-A key feature of the Wingman is the **LocalEventMatcherTool**, which combines personalization and practicality.
+## 🌐 Local Activity Matching (RAG)
 
-### Its Core Functions:
-- Retrieves nearby events from an API or dataset.  
-- Filters by user interests (music, fitness, food, etc.).  
-- Compares against the user’s availability to avoid conflicts.  
-- Ranks suggestions based on interest fit, accessibility, and novelty.  
-- Generates respectful invitation prompts for the top event options.
+Instead of calling APIs (like Eventbrite), this system uses a **local FAISS vector store**.
 
-Example output:
-| Event | Time | Match % | Suggested Invitation |
-|--------|-------|----------|----------------------|
-| Jazz in the Park | Sat 1800–2100 | 0.91 | “There’s a jazz event Saturday evening — if you’d like to go, it could be fun!” |
-| Local Art Walk | Sun 1300–1600 | 0.85 | “There’s an art walk this Sunday afternoon — only if you’re interested!” |
+### Input File:
+```
+activities_catalog_tagged.md
+```
+
+### On first run:
+- The file is chunked into semantic sections  
+- Embedded using MiniLM-L6-v2  
+- Stored at:  
+  ```
+  out/event_activities_index/
+  ```
+- Future runs reuse the index  
+- Querying returns the top-k most relevant activities  
+
+### Output Format:
+```
+📅 Possible Activities:
+• Bowling — Colorado Springs
+• Walk along a local trail — Colorado Springs
+• Dessert spot — Colorado Springs
+```
 
 ---
 
 ## 🚀 Getting Started
 
 ### 1. Clone the Repository
-git clone https://github.com/<your-repo-name>.git
-cd consent-first-social-wingman
+```
+git clone https://github.com/USAFADFCS/final-project-ashton-rylee-andrew.git
+cd final-project-ashton-rylee-andrew
+```
 
 ### 2. Install Dependencies
+```
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
 
-### 3. Run the Prototype
+### 3. Add Your API Keys to `.env`
+```
+OPENAI_API_KEY=your_key_here
+```
+
+### 4. Run the Core Agent
+```
 python main.py
+```
 
-### 4. Example Prompt
-“Help me write a friendly message to someone I met at the gym and suggest a casual activity.”
+### 5. Optional — Launch the UI
+```
+python wingman_ui.py
+```
 
-Expected output:
-A structured, context-aware message with event-based opt-in phrasing.
-
-## 🧾 Documentation Statement
-Authorized assistance from ChatGPT (Level 5 FairLLM usage) was used to help structure this project’s documentation and planning.
-All coding, implementation, and testing will be completed by the project team members.
-
-## 👥 Team Members
-| Name | GitHub Username |
-|------|-----------------|
-| Ashton Blair | @c26ashtonblair |
-| [Partner Name] | @github-username |
-
-
-
-## 📜 License
-This project is for academic and research purposes under the USAFA FairLLM policy.
-Commercial use, reproduction, or unethical deployment is strictly prohibited.
-
-### “Respect is the foundation of communication — AI should never forget that.”
+UI opens at:
+```
+http://127.0.0.1:7860
+```
 
 ---
+
+## 🧪 Testing
+Run the pipeline test:  
+```
+python tests/test_pipeline.py
+```
+
+Expected:
+```
+MessageGenerator OK
+ConsentCheck OK
+ToneAdjuster OK
+LocalEventMatcher OK
+All systems operational
+```
+
+---
+
+## 🧾 Documentation Statement
+Authorized ChatGPT assistance (FairLLM level 5) was used for documentation refinement, debugging strategy, and architectural explanation.  
+All implementation and testing was completed by the project team.
+
+---
+
+## 👥 Team Members
+
+| Name | GitHub |
+|------|--------|
+| **Ashton Blair** | @c26ashtonblair |
+| **[Partner Name]** | @github-username |
+
+---
+
+## 📜 License
+This project is for educational and research purposes under USAFA FairLLM policies.  
+Commercial or unethical use is prohibited.

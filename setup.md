@@ -1,132 +1,180 @@
-# 🛠️ Setup Instructions
+# 🛠️ Setup Instructions  
 **Project:** Consent-First Social Wingman  
 **Course:** CS 471 – FairLLM Final Project  
 **Authors:** Ashton Blair & [Partner Name]  
-**Last Updated:** October 2025
+**Last Updated:** December 2025
 
 ---
 
 ## 📦 1. Overview
-This document explains how to install, configure, and verify the development environment for the **Consent-First Social Wingman** project.  
-It ensures that the **FairLLM framework** and all required dependencies for the agentic AI system are correctly installed and functional.
+This project implements the **Consent-First Social Wingman**, an agentic AI system that:
+
+- Crafts respectful, confident first messages  
+- Analyzes social, romantic, and conversational context  
+- Suggests activities using a **local RAG activity catalog**  
+- Runs a **ReAct-style tool agent** using the FairLLM framework  
+- Presents results through a **Gradio UI**  
+
+Core components used:
+
+- **FairLLM tools & ReAct planner**  
+- **OpenAI GPT-4.1-mini (Responses API)**  
+- **SentenceTransformer embedding model (MiniLM-L6-v2)**  
+- **Local FAISS vector store for activity suggestions**  
+- **Gradio** for a simple user-facing application
 
 ---
 
 ## 🧩 2. System Requirements
+
 **Recommended Environment**
-- **OS:** macOS 13 / Windows 11 / Ubuntu 22.04 LTS  
-- **Python:** 3.10 or 3.11  
-- **Disk Space:** ≥ 10 GB (fair-llm + TinyLlama weights + dependencies)  
-- **RAM:** 8 GB (minimum), 16 GB recommended  
-- **GPU (optional):** CUDA-capable NVIDIA GPU for Torch acceleration  
+- macOS 12+ / Windows 11 / Ubuntu 22.04  
+- Python 3.10–3.12  
+- Disk: ~3 GB free (models + vector index + deps)  
+- RAM: 8 GB minimum, 16 GB recommended  
+- GPU: Optional (CPU works fine for this project)
 
 ---
 
 ## ⚙️ 3. Environment Setup
 
 ### Step 1 — Clone the Repository
-```bash
 git clone https://github.com/USAFADFCS/final-project-ashton-rylee-andrew.git
 cd final-project-ashton-rylee-andrew
-```
 
 ### Step 2 — Create a Virtual Environment
-```bash
 python3 -m venv .venv
-source .venv/bin/activate    # macOS / Linux
-# or
-.venv\Scripts\activate       # Windows PowerShell
-```
+source .venv/bin/activate # macOS / Linux
+.venv\Scripts\activate # Windows
 
 ### Step 3 — Install Dependencies
-```bash
 pip install --upgrade pip
 pip install -r requirements.txt
-```
 
 ### Step 4 — Verify Installations
+python - << 'EOF'
+import fairlib, openai, gradio
+print("✅ Environment OK")
+EOF
 
-Confirm that all core modules import successfully:
-
-```bash
-python -c "import torch, transformers, fairlib, numpy; print('✅ Environment OK')"
-```
+---
 
 ## 🤖 4. Model Setup & Verification
-### Step 1 — Download Base Model
 
-The project uses a small, edge-deployable model:
+This project uses **OpenAI GPT-4.1-mini** through the **Responses API**.
 
-Model: TinyLlama/TinyLlama-1.1B-Chat-v1.0
-Source: https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0
+### Test the LLM Connection
+python3 - << 'EOF'
+from openai import OpenAI
+import os
 
-When you first run the program, the model will download automatically to ~/.cache/huggingface/.
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+resp = client.responses.create(
+model="gpt-4.1-mini",
+input="Say hello!"
+)
+print(resp.output_text)
+EOF
 
-### Step 2 — Test Model Response
-```python
->>> from transformers import AutoModelForCausalLM, AutoTokenizer
->>> tok = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
->>> model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
->>> print("✅ Model loaded successfully")
-```
+
+Expected output:
+Hello!
+
+yaml
+Copy code
+
+---
 
 ## 🔗 5. Environment Variables
 
-Create a .env file in the project root to store API keys and local paths for any external tools.
+Create a `.env` file in the project root:
 
-Example .env:
+OPENAI_API_KEY=your_openai_key_here
 
-### Event data source (API or file path)
-EVENT_API_KEY=your_api_key_here
-EVENT_API_URL=https://www.eventbriteapi.com/v3/events/search/
+## 🧠 6. Local RAG System (Activity Recommendations)
 
-### Optional: Hugging Face token (for authenticated downloads)
-HUGGINGFACE_TOKEN=your_token_here
+The Wingman uses a **local retrieval-augmented system**:
 
-## 🧠 6. Running the Prototype
+- `activities_catalog_tagged.md` — your activity library  
+- `DocumentProcessor` — semantic chunking  
+- `SentenceTransformerEmbedder` — embeddings  
+- `FaissVectorStore` — persistent vector index  
+- `SimpleRetriever` — top-k search  
 
-After setup, you can run the main agent loop:
+### On first run:
+1. The file is chunked automatically  
+2. Embeddings are generated  
+3. A FAISS index is created at:  
+out/event_activities_index/
+4. Future runs reuse cached embeddings + index  
+5. Queries return **top 3 recommended activities**  
 
+No external calls or internet access are needed.
+
+---
+
+## ▶️ 7. Running the Wingman
+
+### Option A — Terminal (ReAct Loop)
 python main.py
 
+Example:
+You: I met someone at the gym—help me ask them out.
+System: [Generates message + activity suggestions]
 
-Example interaction:
+---
 
-User: Help me start a friendly conversation and suggest something fun this weekend.
-System: [Generates 3 consent-first messages + event suggestions]
+### Option B — Gradio UI
+python wingman_ui.py
 
-## 🧪 7. Testing the Pipeline
+Then visit:
 
-Use the built-in test script to verify all tools communicate correctly:
+http://127.0.0.1:7860
+
+
+The UI includes:
+- Input box  
+- Suggested message output  
+- Activity suggestions  
+- A “Stop Server” button
+
+---
+
+## 🧪 8. Testing the Pipeline
+
+Run the tests:
 
 python tests/test_pipeline.py
 
 
 Expected output:
+✅ MessageGeneratorTool OK
+✅ ConsentCheckTool OK
+✅ LocalEventMatcherTool OK
+🎉 All systems operational
 
-✅ MessageGeneratorAgent OK  
-✅ ConsentCheckTool OK  
-✅ LocalEventMatcherTool OK  
-✅ All tests passed!
 
-## 🧰 8. Troubleshooting
-Issue	Possible Cause	Fix
-torch.cuda.is_available() → False	No GPU or CUDA drivers missing	Install CUDA 11.8+ or run CPU mode
-fair_llm not found	Not installed or venv inactive	Re-activate virtual env and re-install requirements
-Model download fails	No Hugging Face auth token	Add HUGGINGFACE_TOKEN to .env
-ImportError: pydantic.v2	Old Python version	Upgrade to Python ≥ 3.10
+---
 
-## 🧾 9. Documentation Statement
+## 🧰 9. Troubleshooting
 
-Authorized assistance from ChatGPT (Level 5 FairLLM usage) was used for project setup and documentation.
-All implementation and testing code will be developed by the project team.
+| Issue | Cause | Fix |
+|-------|--------|------|
+| `'str' object has no attribute content'` | Using old OpenAI response format | Use GPT-4.1-mini + Responses API adapter |
+| Missing FAISS | Dependency not installed | `pip install faiss-cpu` |
+| Tools not found | Running from wrong directory | Run from project root |
+| UI stuck on local only | Default Gradio behavior | Use `launch(share=True)` |
+| Vec store rebuilds every run | File missing or path incorrect | Ensure `activities_catalog_tagged.md` exists |
 
-## ✅ 10. Next Steps
+---
 
-Begin developing core agents (MessageGenerator, ConsentCheck, LocalEventMatcher).
+## 🧾 10. Documentation Statement
 
-Integrate FairLLM tool calls into main.py.
+This project used authorized assistance from ChatGPT (FairLLM Level 5 guidelines) for:
 
-Document test results in /docs/progress_report.md.
+- Architecture guidance  
+- Debugging tool integration  
+- Documentation creation  
 
-Prepare demo for CS 471 progress checkpoint.
+
+---

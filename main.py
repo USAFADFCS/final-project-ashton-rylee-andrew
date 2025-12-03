@@ -3,105 +3,78 @@ import os
 import sys
 import asyncio
 from dotenv import load_dotenv
-from pathlib import Path
 
-load_dotenv()
-
-# --- Core FairLLM imports ---
-from fairlib.modules.mal.huggingface_adapter import HuggingFaceAdapter
 from fairlib import (
+    settings,
+    OpenAIAdapter,      # 👈 same adapter as in the demo
     ToolRegistry,
     ToolExecutor,
     WorkingMemory,
     SimpleAgent,
     SimpleReActPlanner,
-    RoleDefinition
+    RoleDefinition,
 )
 
 # --- Local tools ---
 from tools.consent_check import ConsentCheckTool
 from tools.tone_adjuster import ToneAdjusterTool
-from tools.event_matcher import LocalEventMatcherTool
+from tools.event_matcher import LocalEventMatcherTool   # your activity matcher (RAG or simple)
 from tools.formatter import DialogueFormatterTool
 from tools.context_analyzer import ContextAnalyzerTool
-from tools.message_generator import MessageGeneratorTool
 
-from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
+load_dotenv()
 
+# =========================
+# 1. Model / API config
+# =========================
+# load API key into fairlib settings (like the demo)
+settings.api_keys.openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# === 1. Model Configuration ===
-PREFERRED_MODEL = "microsoft/Phi-3-mini-4k-instruct"
-FALLBACK_MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-hf_token = os.getenv("HUGGING_FACE_HUB_TOKEN")
+PREFERRED_MODEL = "gpt-4.1-mini"  # or "gpt-4o", etc.
 
-
-def ensure_model_available(model_name: str) -> bool:
-    """
-    Check if a Hugging Face model is already downloaded locally.
-    Returns True if available, otherwise tries to download metadata.
-    """
-    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
-    if any(cache_dir.rglob(model_name.split("/")[-1])):
-        print(f"📦 Found cached model for '{model_name}'")
-        return True
-
-    print(f"🌐 Checking availability for '{model_name}'...")
-    try:
-        AutoConfig.from_pretrained(model_name, token=hf_token)
-        AutoTokenizer.from_pretrained(model_name, token=hf_token)
-        AutoModelForCausalLM.from_pretrained(model_name, token=hf_token)
-        print(f"✅ Successfully downloaded '{model_name}'")
-        return True
-    except Exception as e:
-        print(f"⚠️ Could not access '{model_name}': {e}")
-        return False
-
-
-# === 2. Choose model ===
 print("🧠 Preparing language model...\n")
-if ensure_model_available(PREFERRED_MODEL):
-    chosen_model = PREFERRED_MODEL
-else:
-    print(f"🚨 Falling back to safe model: {FALLBACK_MODEL}")
-    chosen_model = FALLBACK_MODEL
 
-# Initialize adapter
-llm = HuggingFaceAdapter(
-    model_name=chosen_model,
-    auth_token=hf_token,
+llm = OpenAIAdapter(
+    api_key=settings.api_keys.openai_api_key,
+    model_name=PREFERRED_MODEL,
 )
 
-print(f"✅ Model ready: {chosen_model}\n")
+print(f"✅ Model ready: {PREFERRED_MODEL}\n")
 
-
-# === 3. Register tools ===
+# =========================
+# 2. Register tools
+# =========================
 tool_registry = ToolRegistry()
 tool_registry.register_tool(ConsentCheckTool())
 tool_registry.register_tool(ToneAdjusterTool())
 tool_registry.register_tool(LocalEventMatcherTool())
 tool_registry.register_tool(DialogueFormatterTool())
 tool_registry.register_tool(ContextAnalyzerTool())
-tool_registry.register_tool(MessageGeneratorTool())
 
 executor = ToolExecutor(tool_registry)
 memory = WorkingMemory()
 
-
-# === 4. Planner and Agent ===
+# =========================
+# 3. Planner and Agent
+# =========================
 planner = SimpleReActPlanner(llm, tool_registry)
 planner.prompt_builder.role_definition = RoleDefinition(
-    "You are the Consent-First Wingman — a friendly assistant who crafts confident, respectful first messages and suggests local events.\n\n"
+    "You are the Consent-First Wingman — a friendly assistant who crafts "
+    "confident, respectful first messages and suggests local events.\n\n"
+    "If you call the 'match_local_events' tool, you MUST:\n"
+    " • Look at the returned activities.\n"
+    " • Pick one or two that best fit the user's vibe.\n"
+    " • Mention them explicitly by name in your Final Answer.\n"
+    "For example, instead of saying 'a fun activity', say something like:\n"
+    " 'Would you like to check out that live music spot or maybe try karaoke sometime?'\n\n"
     "Follow this reasoning format exactly:\n"
     "Thought: <your reasoning>\n"
-    "Action: <one of: analyze_context, generate_message, check_consent, adjust_tone, match_local_events, format_dialogue, or Final Answer>\n"
+    "Action: <one of: analyze_context, match_local_events, Final Answer>\n"
     "Observation: <result of that action>\n\n"
-    "Your goal is to produce ONE friendly message for the user to send — NOT a conversation script.\n"
-    "If you must output a message, it should be a single text like:\n"
-    "\"Hey, it was great meeting you at the gym! How’s your training going lately?\"\n\n"
-    "Never simulate both sides of a conversation. When you reach a suitable message, use:\n"
-    "Action: Final Answer\n"
-    "Observation: <the final single message>"
+    "Your goal is to produce ONE friendly message for the user to send — "
+    "NOT a conversation script."
 )
+
 
 
 
@@ -113,15 +86,40 @@ agent = SimpleAgent(
     max_steps=8,
 )
 
+# main.py (add this near the bottom)
 
-# === 5. CLI (Async Interaction Loop) ===
+async def generate_wingman_response(user_input: str) -> str:
+    """
+    One-shot pipeline: take raw user text, run context analysis,
+    ReAct agent, post-processing tools, and return a pretty string.
+    """
+    # 1) Analyze context
+    context_tool = tool_registry.get_tool("analyze_context")
+    context = context_tool.use(user_input)
+
+    # 2) Run the ReAct agent
+    draft = await agent.arun(user_input)
+
+    # 3) Post-processing with context
+    msg = draft
+    msg = tool_registry.get_tool("check_consent").use(msg, context)
+    msg = tool_registry.get_tool("adjust_tone").use(msg, context)
+
+    # 4) Get activities based on same context
+    events = tool_registry.get_tool("match_local_events").use(context)
+
+    # 5) Format everything nicely
+    final_output = tool_registry.get_tool("format_dialogue").use(msg, events)
+    return final_output
+
+
+# === 4. CLI (Async Interaction Loop) ===
 async def main():
     print("=== 🤖 Consent-First Social Wingman ===")
     print("Type 'quit' or 'exit' to end.\n")
 
     while True:
         try:
-            # Prompt user for input
             user_input = input("You: ").strip()
             if user_input.lower() in {"quit", "exit"}:
                 print("👋 Goodbye!")
@@ -129,16 +127,25 @@ async def main():
 
             print("\n🤖 Wingman: analyzing your message request...\n")
 
-            # Run the reasoning loop
+            # 1️⃣ Analyze context ONCE at the top
+            context_tool = tool_registry.get_tool("analyze_context")
+            context = context_tool.use(user_input)
+
+            # 2️⃣ Let the ReAct agent think / call tools (no context needed here)
             draft = await agent.arun(user_input)
 
-            # 🪄 Post-processing pipeline
+            # 3️⃣ Post-processing pipeline with context
             msg = draft
-            msg = tool_registry.get_tool("check_consent").use(msg)
-            msg = tool_registry.get_tool("adjust_tone").use(msg)
-            msg = tool_registry.get_tool("format_dialogue").use(msg)
+            msg = tool_registry.get_tool("check_consent").use(msg, context)
+            msg = tool_registry.get_tool("adjust_tone").use(msg, context)
 
-            print(f"\n✅ Final Wingman Message:\n{msg}\n")
+            # Activities based on the same context (energy, social, location)
+            events = tool_registry.get_tool("match_local_events").use(context)
+
+            # 4️⃣ Final formatting using message + events
+            final_output = tool_registry.get_tool("format_dialogue").use(msg, events)
+
+            print(f"\n✅ Final Wingman Message:\n{final_output}\n")
 
         except KeyboardInterrupt:
             print("\n👋 Exiting gracefully.")
@@ -147,6 +154,6 @@ async def main():
             print(f"⚠️ Error: {e}\n")
 
 
+
 if __name__ == "__main__":
     asyncio.run(main())
-

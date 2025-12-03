@@ -1,19 +1,21 @@
 # tools/tone_adjuster.py
+
 class ToneAdjusterTool:
-    """Rewrites the tone of a message to be warm and confident."""
     name = "adjust_tone"
-    description = "Rewrites the tone of a message to be warm and confident."
+    description = "Lightly adjusts the tone of the message based on context (situation, energy)."
 
-    def use(self, message: str, context: dict = None) -> str:
-        """Adjusts message tone to sound warmer and more confident."""
-        if context is None:
-            context = {}
+    def use(self, message: str, context: dict | None = None) -> str:
+        context = context or {}
+        msg = message
 
-        # Normalize and enhance tone
-        msg = message.replace("hey", "Hi").replace("!", " 🙂")
-
-        # Add warmth for first-meeting scenarios
-        if "first_meeting" in context.get("situation", ""):
+        # Example: tweak for first meeting
+        situation = context.get("situation")
+        if situation == "first_meeting" and "nice meeting you" not in msg.lower():
             msg = f"It was nice meeting you! {msg}"
+
+        # Example: gentle emoji for low-energy invites
+        energy = context.get("energy")
+        if energy == "low":
+            msg = msg.replace("!", " 🙂")
 
         return msg

@@ -1,29 +1,17 @@
 # tools/consent_check.py
-from tools.base_tool import Tool
 
-class ConsentCheckTool(Tool):
-    """Scans text for consent-based phrasing and flags problematic patterns."""
+class ConsentCheckTool:
+    name = "check_consent"
+    description = "Ensures the message respects consent and gives an easy opt-out."
 
-    def __init__(self):
-        super().__init__(
-            name="check_consent",
-            description="Ensures that messages use clear, respectful, and consent-based phrasing."
-        )
+    def use(self, message: str, context: dict | None = None) -> str:
+        context = context or {}
+        msg = message
 
-    def use(self, message: str, context=None) -> str:
         flagged_terms = ["should", "must", "have to", "need to see you"]
-        adjusted = False
+        lower = msg.lower()
 
-        # Check for phrases that might imply pressure or lack of consent
-        for term in flagged_terms:
-            if term in message.lower():
-                adjusted = True
-                break
+        if any(term in lower for term in flagged_terms) and "if you're comfortable" not in lower:
+            msg = msg.rstrip(".") + " — if you're comfortable, of course."
 
-        if adjusted:
-            if "if you’re comfortable" not in message.lower():
-                message = message.strip() + " — if you’re comfortable, of course."
-
-            message += " [⚠️ Adjusted: added consent phrasing]"
-
-        return message
+        return msg
