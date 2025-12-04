@@ -217,8 +217,8 @@ All implementation and testing was completed by the project team.
 | Name | GitHub |
 |------|--------|
 | **Ashton Blair** | @c26ashtonblair |
-| **Andrew Palmer** | @github-username |
-| **Rylee Au** | @github-username |
+| **Andrew Palmer** | @Andrew-Palmer26 |
+| **Rylee Au** | @rylee808 |
 
 ---
 
